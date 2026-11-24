@@ -1,0 +1,982 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scopus Research Publication Tracker &amp; Institutional Affiliation Extractor</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#4f46e5',
+                        'primary-light': '#6366f1',
+                        accent: '#8b5cf6',
+                        rit: '#4338ca'
+                    }
+                }
+            }
+        }
+    </script>
+    <link rel="stylesheet" href="css/styles.css">
+    <!-- Local Vendor Scripts with CDN fallbacks -->
+    <script src="vendor/xlsx.full.min.js"></script>
+    <script>
+        if (typeof XLSX === 'undefined') {
+            document.write('<script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"><\/script>');
+        }
+    </script>
+    <script src="vendor/chart.umd.js"></script>
+    <script>
+        if (typeof Chart === 'undefined') {
+            document.write('<script src="https://cdn.jsdelivr.net/npm/chart.js"><\/script>');
+        }
+    </script>
+</head>
+<body class="min-h-screen bg-slate-50 text-slate-900 flex flex-col selection:bg-indigo-100 selection:text-indigo-900">
+
+    <!-- Top Navigation Header -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-600 flex items-center justify-center text-white shadow-md shadow-indigo-500/20">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h1 class="text-base sm:text-lg font-bold text-slate-900 tracking-tight leading-tight">
+                                Scopus Research Publication Tracker
+                            </h1>
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                RIT Edition
+                            </span>
+                        </div>
+                        <p class="text-xs text-slate-500 hidden sm:block">
+                            Compare publication records and track institutional research contributions
+                        </p>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <button id="btnLoadDemo" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 transition-colors shadow-sm" title="Load realistic test data with RIT and external publications">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
+                        <span>Load Demo Data</span>
+                    </button>
+                    <button id="btnReset" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 bg-white hover:bg-slate-100 border border-slate-200 transition-colors shadow-sm" title="Clear all loaded files and state">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                        <span class="hidden sm:inline">Reset</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+        <!-- Privacy & Local Security Notice Banner -->
+        <div class="bg-gradient-to-r from-indigo-50/90 via-purple-50/70 to-blue-50/90 border border-indigo-100 rounded-xl p-4 flex items-start gap-3 shadow-sm">
+            <div class="p-2 bg-indigo-600 text-white rounded-lg mt-0.5 flex-shrink-0">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+            </div>
+            <div class="text-xs sm:text-sm text-slate-700 leading-relaxed">
+                <span class="font-bold text-indigo-950">100% In-Browser Local Processing:</span>
+                Your publication records and research data remain strictly on your computer. No data is ever transmitted to any external server or cloud service. Supports <code class="bg-indigo-100/70 text-indigo-900 px-1 py-0.5 rounded font-mono text-xs">.xlsx</code>, <code class="bg-indigo-100/70 text-indigo-900 px-1 py-0.5 rounded font-mono text-xs">.xls</code>, and <code class="bg-indigo-100/70 text-indigo-900 px-1 py-0.5 rounded font-mono text-xs">.csv</code> Scopus exports.
+            </div>
+        </div>
+
+        <!-- Section 1: Upload Zones -->
+        <section class="bg-white rounded-2xl border border-slate-200 p-6 card-shadow">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h2 class="text-lg font-bold text-slate-900 tracking-tight flex items-center gap-2">
+                        <span class="flex items-center justify-center w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold">1</span>
+                        Upload Scopus Export Files
+                    </h2>
+                    <p class="text-xs text-slate-500 mt-0.5">
+                        Upload previous week and today's Scopus exports to compare publications by unique EID.
+                    </p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- File 1: Previous Week Export -->
+                <div class="flex flex-col">
+                    <div class="flex items-center justify-between mb-2">
+                        <label class="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
+                            <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                            File 1 – Previous Week Export
+                        </label>
+                        <span class="text-[11px] text-slate-400">Baseline Export</span>
+                    </div>
+
+                    <div id="dropzone1" class="relative flex-1 min-h-[170px] border-2 border-dashed border-slate-200 hover:border-indigo-400 rounded-xl p-5 flex flex-col items-center justify-center text-center cursor-pointer transition-all bg-slate-50/50 hover:bg-indigo-50/30 group">
+                        <input type="file" id="fileInput1" accept=".xlsx,.xls,.csv" class="hidden">
+                        
+                        <!-- Drop Prompt -->
+                        <div id="dropPrompt1" class="flex flex-col items-center pointer-events-none">
+                            <div class="w-12 h-12 mb-3 rounded-full bg-white shadow-sm border border-slate-200 flex items-center justify-center text-slate-400 group-hover:text-indigo-600 group-hover:border-indigo-200 transition-colors">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                            </div>
+                            <p class="text-sm font-semibold text-slate-700">
+                                Drag &amp; drop previous week's export here
+                            </p>
+                            <p class="text-xs text-slate-400 mt-1">or click to browse (.xlsx, .xls, .csv)</p>
+                        </div>
+
+                        <!-- Loaded File Info -->
+                        <div id="fileInfo1" class="hidden w-full text-left bg-white p-3.5 rounded-lg border border-indigo-200 shadow-sm flex items-center justify-between">
+                            <div class="flex items-center gap-3 overflow-hidden">
+                                <div class="w-9 h-9 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center flex-shrink-0">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                                </div>
+                                <div class="overflow-hidden">
+                                    <div id="fileName1" class="text-xs sm:text-sm font-bold text-slate-800 truncate">filename.xlsx</div>
+                                    <div id="fileMeta1" class="text-xs text-slate-500 font-mono">0 KB • 0 rows</div>
+                                </div>
+                            </div>
+                            <button id="removeFile1" class="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors" title="Remove file">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- File 2: Latest Export -->
+                <div class="flex flex-col">
+                    <div class="flex items-center justify-between mb-2">
+                        <label class="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
+                            <svg class="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            File 2 – Latest Export
+                        </label>
+                        <span class="text-[11px] text-indigo-600 font-semibold">Today's Export</span>
+                    </div>
+
+                    <div id="dropzone2" class="relative flex-1 min-h-[170px] border-2 border-dashed border-indigo-200 hover:border-indigo-500 rounded-xl p-5 flex flex-col items-center justify-center text-center cursor-pointer transition-all bg-indigo-50/20 hover:bg-indigo-50/40 group">
+                        <input type="file" id="fileInput2" accept=".xlsx,.xls,.csv" class="hidden">
+                        
+                        <!-- Drop Prompt -->
+                        <div id="dropPrompt2" class="flex flex-col items-center pointer-events-none">
+                            <div class="w-12 h-12 mb-3 rounded-full bg-white shadow-sm border border-indigo-200 flex items-center justify-center text-indigo-500 group-hover:text-indigo-700 group-hover:border-indigo-300 transition-colors">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                            </div>
+                            <p class="text-sm font-semibold text-slate-700">
+                                Drag &amp; drop today's latest export here
+                            </p>
+                            <p class="text-xs text-slate-400 mt-1">or click to browse (.xlsx, .xls, .csv)</p>
+                        </div>
+
+                        <!-- Loaded File Info -->
+                        <div id="fileInfo2" class="hidden w-full text-left bg-white p-3.5 rounded-lg border border-indigo-300 shadow-sm flex items-center justify-between">
+                            <div class="flex items-center gap-3 overflow-hidden">
+                                <div class="w-9 h-9 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center flex-shrink-0">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                                </div>
+                                <div class="overflow-hidden">
+                                    <div id="fileName2" class="text-xs sm:text-sm font-bold text-slate-800 truncate">filename.xlsx</div>
+                                    <div id="fileMeta2" class="text-xs text-slate-500 font-mono">0 KB • 0 rows</div>
+                                </div>
+                            </div>
+                            <button id="removeFile2" class="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors" title="Remove file">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Run Comparison CTA -->
+            <div class="mt-6 pt-5 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div class="text-xs text-slate-500 flex items-center gap-1.5">
+                    <svg class="w-4 h-4 text-emerald-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
+                    <span>Comparison Key: <code>EID</code> (Electronic Identifier). All original data columns preserved.</span>
+                </div>
+
+                <button id="btnRunAnalysis" disabled class="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl font-bold text-sm text-white bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
+                    <span>Compare Exports &amp; Extract Affiliations</span>
+                </button>
+            </div>
+        </section>
+
+        <!-- Section 2: Results & Dashboard -->
+        <section id="resultsSection" class="hidden space-y-6">
+
+            <!-- 3-STEP ACTION & SUMMARY HUB (User Workflow Priority) -->
+            <div class="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-2xl p-6 text-white shadow-xl border border-indigo-900/60">
+                <div class="flex flex-col lg:flex-row lg:items-center justify-between pb-5 border-b border-indigo-800/60 gap-4">
+                    <div>
+                        <div class="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-indigo-500/20 border border-indigo-400/30 text-indigo-200 text-xs font-semibold mb-2">
+                            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                            Three-Step Automated Research Intelligence Pipeline
+                        </div>
+                        <h2 class="text-xl sm:text-2xl font-black tracking-tight text-white">
+                            Scopus Comparative Analysis &amp; RIT Publication Hub
+                        </h2>
+                        <p class="text-xs sm:text-sm text-slate-300 mt-1 max-w-2xl">
+                            Local in-browser comparison: <strong>Step 1</strong> (Newly added papers via EID) • <strong>Step 2</strong> (RIT authors with Name, Designation &amp; Department from newly added records) • <strong>Step 3</strong> (Q1/Q2/Q3/Q4/SCIE classification from newly added records).
+                        </p>
+                    </div>
+
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <button id="btnExportStep1Xlsx" class="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white shadow-md transition-colors" title="Download newly added publications identified via EID">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                            <span>Download Step 1 Excel</span>
+                        </button>
+                        <button id="btnExportStep2Xlsx" class="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-lg bg-indigo-500 hover:bg-indigo-600 text-white shadow-md transition-colors" title="Download RIT authors with Name, Designation, and Department from newly added records">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                            <span>Download Step 2 Excel</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 3 Cards for Step 1, Step 2, Step 3 -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-5">
+                    <!-- Step 1 Card -->
+                    <div class="bg-slate-800/80 border border-slate-700/80 rounded-xl p-4 flex flex-col justify-between hover:border-emerald-500/50 transition-colors">
+                        <div>
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="px-2.5 py-0.5 rounded text-[11px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                                    Step 1: EID Delta
+                                </span>
+                                <span class="text-[11px] text-slate-400 font-mono">Today − Previous</span>
+                            </div>
+                            <h3 class="text-sm font-bold text-white">Recently Added Papers</h3>
+                            <div class="mt-2 flex items-baseline gap-2">
+                                <span id="hubStep1Count" class="text-3xl font-black text-emerald-400">0</span>
+                                <span class="text-xs text-slate-300 font-medium">New Publications</span>
+                            </div>
+                            <p class="text-xs text-slate-400 mt-2 leading-relaxed">
+                                Identified by comparing EID keys between the two files. Complete row data and original metadata preserved.
+                            </p>
+                        </div>
+                        <div class="mt-4 pt-3 border-t border-slate-700/60 flex items-center justify-between gap-2">
+                            <span class="text-[11px] text-slate-400">Export:</span>
+                            <div class="flex items-center gap-1.5">
+                                <button onclick="document.getElementById('btnExportStep1Xlsx').click()" class="px-2.5 py-1 text-[11px] font-bold rounded bg-emerald-600 hover:bg-emerald-500 text-white transition-colors">
+                                    New_Publications.xlsx
+                                </button>
+                                <button onclick="document.getElementById('btnExportNewCsv').click()" class="px-2 py-1 text-[11px] font-medium rounded bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors">
+                                    CSV
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Step 2 Card -->
+                    <div class="bg-slate-800/80 border border-slate-700/80 rounded-xl p-4 flex flex-col justify-between hover:border-indigo-500/50 transition-colors">
+                        <div>
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="px-2.5 py-0.5 rounded text-[11px] font-black uppercase tracking-wider bg-indigo-500/20 text-indigo-300 border border-indigo-500/40">
+                                    Step 2: RIT Faculty (New Papers Only)
+                                </span>
+                                <span class="text-[11px] text-indigo-300 font-mono">New Records</span>
+                            </div>
+                            <h3 class="text-sm font-bold text-white">RIT Authors (From New Papers)</h3>
+                            <div class="mt-2 flex items-baseline gap-2">
+                                <span id="hubStep2Count" class="text-3xl font-black text-indigo-400">0</span>
+                                <span class="text-xs text-slate-300 font-medium">RIT Authors in New Papers</span>
+                            </div>
+                            <p class="text-xs text-slate-400 mt-2 leading-relaxed">
+                                Extracted <strong class="text-indigo-200">from newly added records only</strong>: provides Name, Designation, and Department for each RIT author.
+                            </p>
+                        </div>
+                        <div class="mt-4 pt-3 border-t border-slate-700/60 flex items-center justify-between gap-2">
+                            <span class="text-[11px] text-slate-400">Export:</span>
+                            <div class="flex items-center gap-1.5">
+                                <button onclick="document.getElementById('btnExportStep2Xlsx').click()" class="px-2.5 py-1 text-[11px] font-bold rounded bg-indigo-600 hover:bg-indigo-500 text-white transition-colors" title="Download RIT authors in newly added papers as Excel">
+                                    New_RIT_Authors.xlsx
+                                </button>
+                                <button onclick="document.getElementById('btnExportAuthorsXlsx').click()" class="px-2 py-1 text-[11px] font-medium rounded bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors" title="All RIT authors directory">
+                                    All Authors
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Step 3 Card -->
+                    <div class="bg-slate-800/80 border border-slate-700/80 rounded-xl p-4 flex flex-col justify-between hover:border-purple-500/50 transition-colors">
+                        <div>
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="px-2.5 py-0.5 rounded text-[11px] font-black uppercase tracking-wider bg-purple-500/20 text-purple-300 border border-purple-500/40">
+                                    Step 3: Quality Index (New Papers Only)
+                                </span>
+                                <span class="text-[11px] text-purple-300 font-mono">New Records</span>
+                            </div>
+                            <h3 class="text-sm font-bold text-white">New Articles Quartile &amp; SCIE Status</h3>
+                            <div class="mt-2 grid grid-cols-5 gap-1 text-center">
+                                <div class="bg-emerald-950/60 border border-emerald-500/30 rounded p-1">
+                                    <div class="text-[10px] font-bold text-emerald-300">Q1</div>
+                                    <div id="hubQ1Count" class="text-sm font-black text-white">0</div>
+                                </div>
+                                <div class="bg-blue-950/60 border border-blue-500/30 rounded p-1">
+                                    <div class="text-[10px] font-bold text-blue-300">Q2</div>
+                                    <div id="hubQ2Count" class="text-sm font-black text-white">0</div>
+                                </div>
+                                <div class="bg-amber-950/60 border border-amber-500/30 rounded p-1">
+                                    <div class="text-[10px] font-bold text-amber-300">Q3</div>
+                                    <div id="hubQ3Count" class="text-sm font-black text-white">0</div>
+                                </div>
+                                <div class="bg-orange-950/60 border border-orange-500/30 rounded p-1">
+                                    <div class="text-[10px] font-bold text-orange-300">Q4</div>
+                                    <div id="hubQ4Count" class="text-sm font-black text-white">0</div>
+                                </div>
+                                <div class="bg-purple-950/60 border border-purple-500/30 rounded p-1">
+                                    <div class="text-[10px] font-bold text-purple-300">SCIE</div>
+                                    <div id="hubScieCount" class="text-sm font-black text-white">0</div>
+                                </div>
+                            </div>
+                            <p class="text-xs text-slate-400 mt-2 leading-relaxed">
+                                Evaluated <strong class="text-purple-200">from newly added records only</strong> via Scopus CiteScore percentiles and Clarivate SCIE indexing.
+                            </p>
+                        </div>
+                        <div class="mt-4 pt-3 border-t border-slate-700/60 flex items-center justify-between gap-2">
+                            <span class="text-[11px] text-slate-400">Quick Filter:</span>
+                            <div class="flex items-center gap-1">
+                                <button onclick="window.filterByQuartile('Q1')" class="px-2 py-0.5 text-[10px] font-bold rounded bg-emerald-700 hover:bg-emerald-600 text-white transition-colors" title="Filter newly added Q1 articles">
+                                    Filter Q1
+                                </button>
+                                <button onclick="window.filterByQuartile('all')" class="px-2 py-0.5 text-[10px] font-medium rounded bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors" title="Show all newly added records">
+                                    Show All
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab Navigation Bar -->
+            <div class="bg-white rounded-2xl border border-slate-200 p-2 card-shadow flex items-center justify-between flex-wrap gap-2">
+                <nav class="flex items-center gap-1.5 flex-wrap">
+                    <button class="nav-tab-btn flex items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-lg bg-indigo-600 text-white shadow-sm transition-all" data-tab="overview">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
+                        <span>Dashboard Overview</span>
+                    </button>
+
+                    <button class="nav-tab-btn flex items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-lg text-slate-600 hover:bg-slate-100 transition-all" data-tab="comparison">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                        <span>New Publications</span>
+                        <span id="badgeNewPubs" class="ml-1 px-1.5 py-0.5 text-xs font-bold rounded-full bg-indigo-100 text-indigo-700">0</span>
+                    </button>
+
+                    <button class="nav-tab-btn flex items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-lg text-slate-600 hover:bg-slate-100 transition-all" data-tab="rit">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
+                        <span>RIT Affiliations</span>
+                        <span id="badgeRitPubs" class="ml-1 px-1.5 py-0.5 text-xs font-bold rounded-full bg-purple-100 text-purple-700">0</span>
+                    </button>
+
+                    <button class="nav-tab-btn flex items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-lg text-slate-600 hover:bg-slate-100 transition-all" data-tab="authors">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+                        <span>RIT Authors</span>
+                        <span id="badgeRitAuthors" class="ml-1 px-1.5 py-0.5 text-xs font-bold rounded-full bg-emerald-100 text-emerald-700">0</span>
+                    </button>
+
+                    <button class="nav-tab-btn flex items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-lg text-slate-600 hover:bg-slate-100 transition-all" data-tab="combined">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                        <span>Combined Analytics</span>
+                    </button>
+
+                    <button class="nav-tab-btn flex items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-lg text-slate-600 hover:bg-slate-100 transition-all" data-tab="diagnostics">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
+                        <span>Diagnostics</span>
+                    </button>
+                </nav>
+
+                <!-- Quick Download Dropdown / Buttons -->
+                <div class="flex items-center gap-1.5 flex-wrap">
+                    <span class="text-xs font-medium text-slate-400 mr-1 hidden lg:inline">Download:</span>
+                    <button id="btnExportNewXlsx" class="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm transition-colors" title="Download New Publications as Excel (.xlsx)">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                        <span>New (.xlsx)</span>
+                    </button>
+                    <button id="btnExportRitXlsx" class="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm transition-colors" title="Download RIT Publications as Excel (.xlsx)">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                        <span>RIT (.xlsx)</span>
+                    </button>
+                    <button id="btnExportAuthorsXlsx" class="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-purple-600 hover:bg-purple-700 text-white shadow-sm transition-colors" title="Download Unique RIT Authors as Excel (.xlsx)">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                        <span>Authors (.xlsx)</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- TAB 1: DASHBOARD OVERVIEW -->
+            <div id="tabPane-overview" class="tab-pane space-y-6">
+                <!-- Comparison Statistics Cards (Feature 1) -->
+                <div>
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="text-sm font-bold uppercase tracking-wider text-slate-500">
+                            Feature 1: Scopus Export Comparison Statistics
+                        </h3>
+                        <span class="text-xs text-slate-400 font-mono">Formula: New = Today's EIDs − Previous EIDs</span>
+                    </div>
+
+                    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+                        <!-- Stat 1 -->
+                        <div class="bg-white rounded-xl border border-slate-200 p-4 card-shadow">
+                            <span class="text-xs font-semibold text-slate-500 block">Previous Records</span>
+                            <span id="statTotalPrev" class="text-2xl font-extrabold text-slate-800 mt-1 block">0</span>
+                            <span class="text-[11px] text-slate-400 mt-0.5 block">File 1 baseline</span>
+                        </div>
+
+                        <!-- Stat 2 -->
+                        <div class="bg-white rounded-xl border border-slate-200 p-4 card-shadow">
+                            <span class="text-xs font-semibold text-slate-500 block">Latest Records</span>
+                            <span id="statTotalLatest" class="text-2xl font-extrabold text-slate-800 mt-1 block">0</span>
+                            <span class="text-[11px] text-slate-400 mt-0.5 block">File 2 today</span>
+                        </div>
+
+                        <!-- Stat 3 (Key KPI: Newly Added) -->
+                        <div class="bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl p-4 text-white shadow-md shadow-emerald-500/20">
+                            <span class="text-xs font-semibold text-emerald-100 block">Newly Added</span>
+                            <span id="statNewPubs" class="text-2xl sm:text-3xl font-black mt-1 block">0</span>
+                            <span class="text-[11px] text-emerald-100 mt-0.5 block">New EID records</span>
+                        </div>
+
+                        <!-- Stat 4 -->
+                        <div class="bg-white rounded-xl border border-slate-200 p-4 card-shadow">
+                            <span class="text-xs font-semibold text-slate-500 block">Existing Publications</span>
+                            <span id="statExistingPubs" class="text-2xl font-extrabold text-slate-800 mt-1 block">0</span>
+                            <span class="text-[11px] text-slate-400 mt-0.5 block">Found in both files</span>
+                        </div>
+
+                        <!-- Stat 5 -->
+                        <div class="bg-white rounded-xl border border-slate-200 p-4 card-shadow">
+                            <span class="text-xs font-semibold text-slate-500 block">Missing / Invalid EIDs</span>
+                            <span id="statMissingEids" class="text-2xl font-extrabold text-amber-600 mt-1 block">0</span>
+                            <span class="text-[11px] text-slate-400 mt-0.5 block">Blank or null EIDs</span>
+                        </div>
+
+                        <!-- Stat 6 -->
+                        <div class="bg-white rounded-xl border border-slate-200 p-4 card-shadow">
+                            <span class="text-xs font-semibold text-slate-500 block">Duplicate EIDs</span>
+                            <span id="statDuplicateEids" class="text-2xl font-extrabold text-slate-800 mt-1 block">0</span>
+                            <span class="text-[11px] text-slate-400 mt-0.5 block">Deduplicated safely</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Combined Summary Cards (Feature 3) -->
+                <div>
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="text-sm font-bold uppercase tracking-wider text-slate-500">
+                            Feature 3: Combined Institutional Research Summary
+                        </h3>
+                        <span class="text-xs text-indigo-600 font-semibold">Rajalakshmi Institute of Technology (RIT)</span>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div class="bg-white rounded-xl border border-slate-200 p-5 card-shadow flex items-center gap-4">
+                            <div class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            </div>
+                            <div>
+                                <span class="text-xs font-semibold text-slate-500">Total Newly Added</span>
+                                <div id="statCombinedNew" class="text-2xl font-extrabold text-slate-900 mt-0.5">0</div>
+                                <span class="text-[11px] text-slate-400">All institutions in today export</span>
+                            </div>
+                        </div>
+
+                        <div class="bg-white rounded-xl border border-indigo-200 p-5 card-shadow flex items-center gap-4 bg-indigo-50/20">
+                            <div class="w-12 h-12 rounded-xl bg-indigo-600 text-white flex items-center justify-center flex-shrink-0 shadow-sm shadow-indigo-600/30">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"></path></svg>
+                            </div>
+                            <div>
+                                <span class="text-xs font-semibold text-indigo-700">New RIT Publications</span>
+                                <div id="statCombinedRitNew" class="text-2xl font-extrabold text-indigo-900 mt-0.5">0</div>
+                                <span class="text-[11px] text-indigo-600/80">Added today with RIT authors</span>
+                            </div>
+                        </div>
+
+                        <div class="bg-white rounded-xl border border-slate-200 p-5 card-shadow flex items-center gap-4">
+                            <div class="w-12 h-12 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center flex-shrink-0">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
+                            </div>
+                            <div>
+                                <span class="text-xs font-semibold text-slate-500">Total RIT Publications</span>
+                                <div id="statCombinedRitTotal" class="text-2xl font-extrabold text-slate-900 mt-0.5">0</div>
+                                <span class="text-[11px] text-slate-400">Total RIT papers in export</span>
+                            </div>
+                        </div>
+
+                        <div class="bg-white rounded-xl border border-slate-200 p-5 card-shadow flex items-center gap-4">
+                            <div class="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center flex-shrink-0">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+                            </div>
+                            <div>
+                                <span class="text-xs font-semibold text-slate-500">Unique RIT Authors</span>
+                                <div id="statCombinedRitAuthors" class="text-2xl font-extrabold text-slate-900 mt-0.5">0</div>
+                                <span class="text-[11px] text-slate-400">Deduplicated faculty/scholars</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Journal Quartile Breakdown (Q1, Q2, Q3, Q4) -->
+                    <div class="mt-6">
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="text-sm font-bold uppercase tracking-wider text-slate-500 flex items-center gap-2">
+                                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                                Journal Quartile Quality Metrics (Articles &amp; Reviews)
+                            </h3>
+                            <span class="text-xs text-slate-400 font-mono">Scopus / SCImago CiteScore Quartiles</span>
+                        </div>
+
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                            <!-- Q1 -->
+                            <div class="bg-gradient-to-br from-emerald-50 to-emerald-100/60 border border-emerald-300 rounded-xl p-4 card-shadow">
+                                <div class="flex items-center justify-between">
+                                    <span class="px-2.5 py-0.5 rounded text-xs font-black bg-emerald-600 text-white shadow-sm">Q1</span>
+                                    <span class="text-[11px] font-semibold text-emerald-700">Top 25%</span>
+                                </div>
+                                <div id="statQ1Count" class="text-2xl font-extrabold text-emerald-950 mt-2">0</div>
+                                <span class="text-[11px] text-emerald-700/80 mt-0.5 block font-medium">Premier International Journals</span>
+                            </div>
+
+                            <!-- Q2 -->
+                            <div class="bg-gradient-to-br from-blue-50 to-blue-100/60 border border-blue-300 rounded-xl p-4 card-shadow">
+                                <div class="flex items-center justify-between">
+                                    <span class="px-2.5 py-0.5 rounded text-xs font-black bg-blue-600 text-white shadow-sm">Q2</span>
+                                    <span class="text-[11px] font-semibold text-blue-700">25% - 50%</span>
+                                </div>
+                                <div id="statQ2Count" class="text-2xl font-extrabold text-blue-950 mt-2">0</div>
+                                <span class="text-[11px] text-blue-700/80 mt-0.5 block font-medium">High Impact Journals</span>
+                            </div>
+
+                            <!-- Q3 -->
+                            <div class="bg-gradient-to-br from-amber-50 to-amber-100/60 border border-amber-300 rounded-xl p-4 card-shadow">
+                                <div class="flex items-center justify-between">
+                                    <span class="px-2.5 py-0.5 rounded text-xs font-black bg-amber-600 text-white shadow-sm">Q3</span>
+                                    <span class="text-[11px] font-semibold text-amber-700">50% - 75%</span>
+                                </div>
+                                <div id="statQ3Count" class="text-2xl font-extrabold text-amber-950 mt-2">0</div>
+                                <span class="text-[11px] text-amber-700/80 mt-0.5 block font-medium">Reputed Journals</span>
+                            </div>
+
+                            <!-- Q4 -->
+                            <div class="bg-gradient-to-br from-orange-50 to-orange-100/60 border border-orange-300 rounded-xl p-4 card-shadow">
+                                <div class="flex items-center justify-between">
+                                    <span class="px-2.5 py-0.5 rounded text-xs font-black bg-orange-600 text-white shadow-sm">Q4</span>
+                                    <span class="text-[11px] font-semibold text-orange-700">Bottom 25%</span>
+                                </div>
+                                <div id="statQ4Count" class="text-2xl font-extrabold text-orange-950 mt-2">0</div>
+                                <span class="text-[11px] text-orange-700/80 mt-0.5 block font-medium">Indexed Journals</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Three Download Action Banners -->
+                <div class="bg-white rounded-2xl border border-slate-200 p-6 card-shadow">
+                    <h4 class="text-sm font-bold text-slate-900 mb-1">Generated Output Datasets (Available for Immediate Download)</h4>
+                    <p class="text-xs text-slate-500 mb-4">Export any dataset in full Excel (.xlsx) or CSV format with 100% original Scopus metadata preserved.</p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <!-- Card 1 -->
+                        <div class="p-4 rounded-xl border border-emerald-200 bg-emerald-50/30 flex flex-col justify-between">
+                            <div>
+                                <div class="flex items-center gap-2 text-emerald-800 font-bold text-sm">
+                                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                                    1. New Publications
+                                </div>
+                                <p class="text-xs text-slate-600 mt-1 leading-relaxed">
+                                    Publications in today's export absent in previous export, identified via EID.
+                                </p>
+                            </div>
+                            <div class="mt-4 pt-3 border-t border-emerald-100 flex items-center gap-2">
+                                <button onclick="document.getElementById('btnExportNewXlsx').click()" class="flex-1 py-1.5 px-3 text-xs font-bold text-center rounded bg-emerald-600 text-white hover:bg-emerald-700 transition-colors shadow-sm">
+                                    Excel (.xlsx)
+                                </button>
+                                <button id="btnExportNewCsv" class="flex-1 py-1.5 px-3 text-xs font-semibold text-center rounded bg-white text-emerald-800 border border-emerald-300 hover:bg-emerald-50 transition-colors">
+                                    CSV (.csv)
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Card 2 -->
+                        <div class="p-4 rounded-xl border border-indigo-200 bg-indigo-50/30 flex flex-col justify-between">
+                            <div>
+                                <div class="flex items-center gap-2 text-indigo-900 font-bold text-sm">
+                                    <span class="w-2.5 h-2.5 rounded-full bg-indigo-600"></span>
+                                    2. RIT Publications
+                                </div>
+                                <p class="text-xs text-slate-600 mt-1 leading-relaxed">
+                                    All papers having at least one author affiliated with Rajalakshmi Institute of Technology.
+                                </p>
+                            </div>
+                            <div class="mt-4 pt-3 border-t border-indigo-100 flex items-center gap-2">
+                                <button onclick="document.getElementById('btnExportRitXlsx').click()" class="flex-1 py-1.5 px-3 text-xs font-bold text-center rounded bg-indigo-600 text-white hover:bg-indigo-700 transition-colors shadow-sm">
+                                    Excel (.xlsx)
+                                </button>
+                                <button id="btnExportRitCsv" class="flex-1 py-1.5 px-3 text-xs font-semibold text-center rounded bg-white text-indigo-900 border border-indigo-300 hover:bg-indigo-50 transition-colors">
+                                    CSV (.csv)
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Card 3 -->
+                        <div class="p-4 rounded-xl border border-purple-200 bg-purple-50/30 flex flex-col justify-between">
+                            <div>
+                                <div class="flex items-center gap-2 text-purple-900 font-bold text-sm">
+                                    <span class="w-2.5 h-2.5 rounded-full bg-purple-600"></span>
+                                    3. RIT Unique Authors
+                                </div>
+                                <p class="text-xs text-slate-600 mt-1 leading-relaxed">
+                                    Deduplicated list of RIT authors with total publications count and titles.
+                                </p>
+                            </div>
+                            <div class="mt-4 pt-3 border-t border-purple-100 flex items-center gap-2">
+                                <button onclick="document.getElementById('btnExportAuthorsXlsx').click()" class="flex-1 py-1.5 px-3 text-xs font-bold text-center rounded bg-purple-600 text-white hover:bg-purple-700 transition-colors shadow-sm">
+                                    Excel (.xlsx)
+                                </button>
+                                <button id="btnExportAuthorsCsv" class="flex-1 py-1.5 px-3 text-xs font-semibold text-center rounded bg-white text-purple-900 border border-purple-300 hover:bg-purple-50 transition-colors">
+                                    CSV (.csv)
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 2 & 3: INTERACTIVE PUBLICATION TABLE (Used for New Publications & RIT Publications) -->
+            <div id="tabPane-comparison" class="tab-pane space-y-4">
+                <!-- Table View Controls -->
+                <div class="bg-white rounded-2xl border border-slate-200 p-5 card-shadow space-y-4">
+                    <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                        <!-- Subnav Dataset Switcher -->
+                        <div class="flex items-center gap-1.5 flex-wrap">
+                            <span class="text-xs font-semibold text-slate-500 mr-1">Display View:</span>
+                            <button class="table-subnav-btn px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-indigo-600 text-white shadow-sm" data-type="new">
+                                All New Publications
+                            </button>
+                            <button class="table-subnav-btn px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-white text-slate-600 border border-slate-200 hover:bg-slate-50" data-type="rit-new">
+                                New RIT Publications Only
+                            </button>
+                            <button class="table-subnav-btn px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-white text-slate-600 border border-slate-200 hover:bg-slate-50" data-type="rit-all">
+                                All RIT Publications (Cumulative)
+                            </button>
+                        </div>
+
+                        <!-- Search & Filter Controls -->
+                        <div class="flex items-center gap-2 flex-wrap flex-1 lg:justify-end">
+                            <!-- Search -->
+                            <div class="relative flex-1 sm:w-64 max-w-xs">
+                                <input type="text" id="tableSearchInput" placeholder="Search title, author, EID, DOI..." class="w-full text-xs pl-8 pr-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+                                <svg class="w-4 h-4 text-slate-400 absolute left-2.5 top-2.5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                            </div>
+
+                            <!-- Year Filter -->
+                            <select id="tableYearFilter" class="text-xs py-2 px-3 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                <option value="all">All Years</option>
+                            </select>
+
+                            <!-- Document Type Filter -->
+                            <select id="tableDocTypeFilter" class="text-xs py-2 px-3 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                <option value="all">All Document Types</option>
+                            </select>
+
+                            <!-- Quartile Filter (Q1, Q2, Q3, Q4, SCIE) -->
+                            <select id="tableQuartileFilter" class="text-xs py-2 px-3 rounded-lg border border-indigo-200 bg-indigo-50/40 text-indigo-900 font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                <option value="all">All Journal Rankings (Q1–Q4 / SCIE)</option>
+                                <option value="Q1">Q1 Articles Only</option>
+                                <option value="Q2">Q2 Articles Only</option>
+                                <option value="Q3">Q3 Articles Only</option>
+                                <option value="Q4">Q4 Articles Only</option>
+                                <option value="SCIE">SCIE Indexed Only</option>
+                                <option value="Q1-Q2">Top Tier (Q1 &amp; Q2)</option>
+                                <option value="Conference">Conference Papers</option>
+                            </select>
+
+                            <!-- Page size -->
+                            <select id="tablePageSize" class="text-xs py-2 px-2.5 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono">
+                                <option value="10">10 / page</option>
+                                <option value="15" selected>15 / page</option>
+                                <option value="25">25 / page</option>
+                                <option value="50">50 / page</option>
+                                <option value="100">100 / page</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Table Record Count & Status -->
+                    <div class="flex items-center justify-between text-xs text-slate-500 pt-2 border-t border-slate-100">
+                        <div id="tableRecordCount">Showing 0 publications</div>
+                        <div class="text-[11px] text-slate-400">Click any column header to sort • Click title or "Details" to inspect complete Scopus row</div>
+                    </div>
+
+                    <!-- Scrollable Responsive Table -->
+                    <div class="overflow-x-auto rounded-xl border border-slate-200 shadow-sm max-h-[600px] overflow-y-auto">
+                        <table class="min-w-full divide-y divide-slate-200 text-left bg-white">
+                            <thead id="resultsTableHead" class="sticky top-0 bg-slate-50 z-10 shadow-sm">
+                                <!-- Generated by JS -->
+                            </thead>
+                            <tbody id="resultsTableBody" class="divide-y divide-slate-100 text-xs">
+                                <!-- Generated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Pagination Controls -->
+                    <div class="flex items-center justify-between pt-2">
+                        <div class="text-xs text-slate-400">Page Navigation</div>
+                        <div id="paginationControls">
+                            <!-- Generated by JS -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 3: RIT SPECIFIC OVERVIEW -->
+            <div id="tabPane-rit" class="tab-pane space-y-6 hidden">
+                <div class="bg-white rounded-2xl border border-slate-200 p-6 card-shadow">
+                    <div class="flex items-center justify-between pb-4 border-b border-slate-100 flex-wrap gap-4">
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <span class="px-2.5 py-1 rounded-md text-xs font-bold bg-indigo-100 text-indigo-800">Section 4</span>
+                                <h3 class="text-base font-bold text-slate-900">RIT – Research Author Affiliation Extractor</h3>
+                            </div>
+                            <p class="text-xs text-slate-500 mt-1">
+                                Identifies authors specifically mapped to <span class="font-semibold text-indigo-900">Rajalakshmi Institute of Technology</span> from individual <code class="font-mono">Author Name, Affiliation</code> tuples inside the <code class="font-mono">Authors with affiliations</code> column.
+                            </p>
+                        </div>
+
+                        <div class="flex items-center gap-2">
+                            <button onclick="document.getElementById('btnExportRitXlsx').click()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm transition-colors">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                                <span>Download RIT_Publications.xlsx</span>
+                            </button>
+                            <button onclick="document.getElementById('btnExportRitCsv').click()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-indigo-800 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 transition-colors">
+                                <span>CSV</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Specification Rule Checklist Callout -->
+                    <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3 text-xs bg-slate-50 p-4 rounded-xl border border-slate-100">
+                        <div class="flex items-start gap-2">
+                            <svg class="w-4 h-4 text-emerald-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
+                            <span><strong>Target Match:</strong> "Rajalakshmi Institute of Technology" (case-insensitive, normalized spaces and punctuation).</span>
+                        </div>
+                        <div class="flex items-start gap-2">
+                            <svg class="w-4 h-4 text-emerald-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
+                            <span><strong>Specific Author Mapping:</strong> Only authors matching RIT are extracted into <code>RIT Authors</code>. Non-RIT authors are strictly excluded.</span>
+                        </div>
+                        <div class="flex items-start gap-2">
+                            <svg class="w-4 h-4 text-emerald-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
+                            <span><strong>Multi-Author Support:</strong> Captures all RIT co-authors if multiple faculty/students share authorship.</span>
+                        </div>
+                        <div class="flex items-start gap-2">
+                            <svg class="w-4 h-4 text-emerald-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
+                            <span><strong>Output Columns Spec:</strong> EID, Title, Year, Authors, RIT Authors, Authors with affiliations, Affiliations, DOI, Source title, Document Type.</span>
+                        </div>
+                    </div>
+
+                    <div class="mt-6">
+                        <button onclick="document.querySelector('[data-tab=\'comparison\']').click(); window.switchTableSubNav && window.switchTableSubNav('rit-all');" class="inline-flex items-center gap-2 px-4 py-2 text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 rounded-lg transition-colors">
+                            <span>Open RIT Publications Interactive Data Table →</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 4: RIT UNIQUE AUTHORS -->
+            <div id="tabPane-authors" class="tab-pane space-y-4 hidden">
+                <div class="bg-white rounded-2xl border border-slate-200 p-5 card-shadow space-y-4">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-slate-100">
+                        <div>
+                            <h3 class="text-base font-bold text-slate-900">Deduplicated RIT Authors Directory</h3>
+                            <p class="text-xs text-slate-500 mt-0.5">Authors affiliated with Rajalakshmi Institute of Technology with Designation and Department</p>
+                        </div>
+
+                        <!-- Scope Switcher & Search & Download -->
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <div class="inline-flex items-center rounded-lg border border-slate-200 p-0.5 bg-slate-100">
+                                <button id="btnAuthorsScopeNew" onclick="window.switchAuthorsScope('new')" class="px-2.5 py-1 text-xs font-bold rounded-md bg-white text-indigo-700 shadow-sm transition-all">
+                                    New Papers (Step 2)
+                                </button>
+                                <button id="btnAuthorsScopeAll" onclick="window.switchAuthorsScope('all')" class="px-2.5 py-1 text-xs font-semibold rounded-md text-slate-600 hover:text-slate-900 transition-all">
+                                    All Records
+                                </button>
+                            </div>
+
+                            <div class="relative w-56">
+                                <input type="text" id="authorsSearchInput" placeholder="Search name, designation, dept..." class="w-full text-xs pl-8 pr-3 py-1.5 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                <svg class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                            </div>
+                            <button onclick="document.getElementById('btnExportStep2Xlsx').click()" class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-sm transition-colors" title="Download RIT authors in newly added papers as Excel">
+                                <span>Export Step 2 (.xlsx)</span>
+                            </button>
+                            <button onclick="document.getElementById('btnExportAuthorsXlsx').click()" class="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-purple-900 bg-purple-50 border border-purple-200 hover:bg-purple-100 rounded-lg transition-colors" title="All RIT authors directory">
+                                <span>All (.xlsx)</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-between text-xs text-slate-500">
+                        <div id="authorsRecordCount">Total: 0 Unique RIT Authors</div>
+                        <div class="text-slate-400">Sorted by publication volume</div>
+                    </div>
+
+                    <!-- Authors Table -->
+                    <div class="overflow-x-auto rounded-xl border border-slate-200 shadow-sm max-h-[550px] overflow-y-auto">
+                        <table class="min-w-full divide-y divide-slate-200 text-left bg-white">
+                            <thead class="sticky top-0 bg-slate-50 z-10 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                                <tr>
+                                    <th class="px-4 py-3 w-12">#</th>
+                                    <th class="px-4 py-3">RIT Author Name</th>
+                                    <th class="px-4 py-3 w-36">Designation</th>
+                                    <th class="px-4 py-3 w-48">Department</th>
+                                    <th class="px-4 py-3 text-center w-28">Publications</th>
+                                    <th class="px-4 py-3 text-center w-36">Publication Years</th>
+                                    <th class="px-4 py-3">Publications in Scopus Export</th>
+                                </tr>
+                            </thead>
+                            <tbody id="authorsTableBody" class="divide-y divide-slate-100 text-xs">
+                                <!-- Generated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 5: COMBINED ANALYTICS & CHARTS -->
+            <div id="tabPane-combined" class="tab-pane space-y-6 hidden">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Chart 1: Year-wise Publication Distribution -->
+                    <div class="bg-white rounded-2xl border border-slate-200 p-5 card-shadow">
+                        <div class="flex items-center justify-between mb-4">
+                            <div>
+                                <h4 class="text-sm font-bold text-slate-900">Year-wise Publication Distribution</h4>
+                                <p class="text-xs text-slate-500">Comparing RIT contributions vs other institutions by year</p>
+                            </div>
+                            <span class="text-xs font-semibold px-2 py-0.5 rounded bg-indigo-50 text-indigo-700">Chronological</span>
+                        </div>
+                        <div class="h-64 relative">
+                            <canvas id="chartYearDistribution"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Chart 2: Top Contributing RIT Authors -->
+                    <div class="bg-white rounded-2xl border border-slate-200 p-5 card-shadow">
+                        <div class="flex items-center justify-between mb-4">
+                            <div>
+                                <h4 class="text-sm font-bold text-slate-900">Top Contributing RIT Authors</h4>
+                                <p class="text-xs text-slate-500">Faculty/researchers with highest publication volume in export</p>
+                            </div>
+                            <span class="text-xs font-semibold px-2 py-0.5 rounded bg-purple-50 text-purple-700">Leaderboard</span>
+                        </div>
+                        <div class="h-64 relative">
+                            <canvas id="chartTopAuthors"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Chart 3: Journal Quartile Distribution (Q1, Q2, Q3, Q4) -->
+                    <div class="bg-white rounded-2xl border border-slate-200 p-5 card-shadow">
+                        <div class="flex items-center justify-between mb-4">
+                            <div>
+                                <h4 class="text-sm font-bold text-slate-900">Journal Quartile Distribution</h4>
+                                <p class="text-xs text-slate-500">Breakdown of Articles &amp; Reviews by Q1, Q2, Q3, and Q4</p>
+                            </div>
+                            <span class="text-xs font-semibold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">Quality Index</span>
+                        </div>
+                        <div class="h-64 relative">
+                            <canvas id="chartQuartileDistribution"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Chart 4: Document Type Breakdown -->
+                    <div class="bg-white rounded-2xl border border-slate-200 p-5 card-shadow">
+                        <div class="flex items-center justify-between mb-4">
+                            <div>
+                                <h4 class="text-sm font-bold text-slate-900">Publication Document Types</h4>
+                                <p class="text-xs text-slate-500">Distribution of Articles, Conference Papers, Reviews, and Letters</p>
+                            </div>
+                            <span class="text-xs font-semibold px-2 py-0.5 rounded bg-blue-50 text-blue-700">Format</span>
+                        </div>
+                        <div class="h-64 relative">
+                            <canvas id="chartDocTypes"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 6: DIAGNOSTICS & VALIDATION -->
+            <div id="tabPane-diagnostics" class="tab-pane space-y-4 hidden">
+                <div class="bg-white rounded-2xl border border-slate-200 p-6 card-shadow space-y-4">
+                    <div class="pb-3 border-b border-slate-100">
+                        <h3 class="text-base font-bold text-slate-900">Data Integrity &amp; Diagnostics Audit</h3>
+                        <p class="text-xs text-slate-500 mt-0.5">Verification of EID column headers, missing records, duplicates, and Scopus field mappings</p>
+                    </div>
+
+                    <div id="diagContainer">
+                        <!-- Generated by JS -->
+                    </div>
+                </div>
+            </div>
+
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-slate-200 py-6 mt-12 text-center text-xs text-slate-400">
+        <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
+            <div>
+                Scopus Research Publication Tracker • Built for Academic &amp; Research Analytics
+            </div>
+            <div class="text-[11px] text-slate-400">
+                Client-Side Processing • Strict Data Privacy • No Cloud Uploads
+            </div>
+        </div>
+    </footer>
+
+    <!-- Publication Details Modal -->
+    <div id="recordModal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl border border-slate-200 max-w-2xl w-full shadow-2xl overflow-hidden transform transition-all animate-in fade-in zoom-in-95 duration-200">
+            <div class="p-5 border-b border-slate-100 flex items-start justify-between gap-4 bg-slate-50/70">
+                <div class="overflow-hidden">
+                    <span class="text-[11px] font-bold uppercase tracking-wider text-indigo-600 block mb-0.5">Scopus Publication Details</span>
+                    <h3 id="modalTitle" class="text-base font-bold text-slate-900 leading-snug line-clamp-2">Publication Title</h3>
+                </div>
+                <button id="modalCloseBtn" class="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 rounded-lg transition-colors flex-shrink-0">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <div id="modalContent" class="p-6 max-h-[75vh] overflow-y-auto text-sm">
+                <!-- Injected by JS -->
+            </div>
+            <div class="p-4 border-t border-slate-100 bg-slate-50 flex justify-end">
+                <button onclick="document.getElementById('recordModal').classList.add('hidden')" class="px-4 py-2 text-xs font-semibold rounded-lg bg-slate-800 text-white hover:bg-slate-900 transition-colors">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Indicator Overlay -->
+    <div id="loadingOverlay" class="hidden fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center">
+        <div class="bg-white p-6 rounded-2xl shadow-xl flex flex-col items-center gap-3 border border-slate-100 max-w-sm w-full mx-4">
+            <div class="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
+            <p id="loadingText" class="text-sm font-semibold text-slate-800 text-center">Processing publication data...</p>
+            <p class="text-xs text-slate-400 text-center">Calculating EID diffs &amp; extracting RIT author affiliations</p>
+        </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="notificationToast" class="fixed bottom-5 right-5 z-50 flex items-center px-4 py-3 rounded-lg shadow-lg border text-sm font-medium transition-all duration-300 transform translate-y-4 opacity-0 pointer-events-none">
+        <span id="toastMessage">Notification message</span>
+    </div>
+
+    <!-- Application Script Modules -->
+    <script src="js/sample-data.js"></script>
+    <script src="js/scopus-parser.js"></script>
+    <script src="js/journal-quartile.js"></script>
+    <script src="js/scopus-comparator.js"></script>
+    <script src="js/rit-extractor.js"></script>
+    <script src="js/exporter.js"></script>
+    <script src="js/charts.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
